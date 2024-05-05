@@ -1,12 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/gorilla/websocket"
 	"github.com/kushal0511-not/toll_calculator/types"
 )
@@ -34,28 +32,20 @@ func main() {
 type DataReceiver struct {
 	msgCh chan types.OBUData
 	conn  *websocket.Conn
-	prod  *kafka.Producer
+	prod  DataProducer
 }
 
 func NewDataReceiver() (*DataReceiver, error) {
-	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
+	var (
+		p     DataProducer
+		err   error
+		topic = "obudata"
+	)
+	p, err = NewKafkaProducer(topic)
 	if err != nil {
 		return nil, err
 	}
-	// Start goroutine to check if we delivered message
-	go func() {
-		for e := range p.Events() {
-			switch ev := e.(type) {
-			case *kafka.Message:
-				if ev.TopicPartition.Error != nil {
-					fmt.Printf("Delivery failed: %v\n", ev.TopicPartition)
-				} else {
-					fmt.Printf("Delivered message to %v\n", ev.TopicPartition)
-				}
-			}
-		}
-	}()
-
+	p = NewLoggingMiddleware(p)
 	return &DataReceiver{
 		msgCh: make(chan types.OBUData, 120),
 		prod:  p,
@@ -71,18 +61,7 @@ func (dr *DataReceiver) handleWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (dr *DataReceiver) produceData(data types.OBUData) error {
-	dataBytes, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	err = dr.prod.Produce(&kafka.Message{
-		TopicPartition: kafka.TopicPartition{
-			Topic:     &topic,
-			Partition: kafka.PartitionAny},
-		Value: dataBytes,
-	}, nil)
-
-	return err
+	return dr.prod.ProduceData(data)
 }
 
 func (dr *DataReceiver) wsReceiveLoop() {
