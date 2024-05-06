@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/kushal0511-not/toll_calculator/aggregator/client"
 	"github.com/kushal0511-not/toll_calculator/types"
 )
 
@@ -17,9 +20,10 @@ type KafkaConsumer struct {
 	consumer    *kafka.Consumer
 	isRunning   bool
 	calcService CalculatorServicer
+	aggClient   client.Client
 }
 
-func NewKafkaConsumer(topic string, svc CalculatorServicer) (DataConsumer, error) {
+func NewKafkaConsumer(topic string, svc CalculatorServicer, aggClient client.Client) (DataConsumer, error) {
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost",
 		"group.id":          "myGroup",
@@ -36,6 +40,7 @@ func NewKafkaConsumer(topic string, svc CalculatorServicer) (DataConsumer, error
 		consumer:    c,
 		isRunning:   true,
 		calcService: svc,
+		aggClient:   aggClient,
 	}, nil
 }
 
@@ -62,6 +67,15 @@ func (c *KafkaConsumer) ConsumeData() error {
 			continue
 		}
 		fmt.Printf("Calculated Distance: %.2f\n", distance)
+		req := &types.AggregateRequest{
+			ObuId: int32(data.OBUID),
+			Value: distance,
+			Unix:  time.Now().Unix(),
+		}
+		if err := c.aggClient.Aggregate(context.Background(), req); err != nil {
+			slog.Error("Error sending data to aggregator")
+			continue
+		}
 	}
 
 	c.consumer.Close()
