@@ -32,3 +32,16 @@ func (c *GRPCClient) Aggregate(ctx context.Context, aggReq *types.AggregateReque
 	}
 	return nil
 }
+
+func (c *GRPCClient) GetInvoice(ctx context.Context, invReq *types.InvoiceRequest) (*types.Invoice, error) {
+	resp, err := c.Client.GetInvoice(ctx, invReq)
+	if err != nil {
+		return nil, err
+	}
+	invoice := &types.Invoice{
+		OBUID:         int(resp.ObuId),
+		TotalAmount:   resp.TotalAmount,
+		TotalDistance: resp.TotalDistance,
+	}
+	return invoice, err
+}

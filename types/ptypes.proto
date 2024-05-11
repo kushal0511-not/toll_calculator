@@ -4,11 +4,19 @@ option go_package = "github.com/kushal0511-not/toll_calculator/types";
 
 service Aggregator {
     rpc Aggregate(AggregateRequest)returns(None);
-
+    rpc GetInvoice(InvoiceRequest)returns(InvoiceResponse);
 }
 message None{}
 message AggregateRequest{
     int32 ObuId = 1;
     double Value = 2;
     int64 Unix = 3; 
+}
+message InvoiceRequest{
+    int32 ObuId = 1;
+}
+message InvoiceResponse{
+    int32 ObuId = 1;
+    double TotalDistance = 2;
+    double TotalAmount = 3;
 }

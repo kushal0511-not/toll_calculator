@@ -13,7 +13,7 @@ type DistanceCalculator struct {
 
 var (
 	topic    = "OBUData"
-	endpoint = "http://127.0.0.1:3030/aggregate"
+	endpoint = "http://127.0.0.1:3030"
 	// grpcEndpoint = ":3031"
 )
 

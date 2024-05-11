@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 	"time"
 
@@ -27,7 +26,7 @@ func genCoord() float64 {
 func genOBUIDs(n int) []int {
 	obusids := make([]int, n)
 	for i := 0; i < n; i++ {
-		obusids[i] = rand.Intn(math.MaxInt)
+		obusids[i] = rand.Intn(100000)
 	}
 	return obusids
 }
