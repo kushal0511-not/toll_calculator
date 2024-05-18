@@ -10,8 +10,30 @@ import (
 	"strconv"
 
 	"github.com/kushal0511-not/toll_calculator/types"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 )
+
+var (
+	aggregateCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "toll_calculator",
+		Subsystem: "api",
+		Name:      "aggregate_requests_total",
+		Help:      "Total number of POST requests to /aggregate endpoint",
+	})
+	getInvoiceCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "toll_calculator",
+		Subsystem: "api",
+		Name:      "get_invoice_requests_total",
+		Help:      "Total number of GET requests to /invoices endpoint",
+	})
+)
+
+func init() {
+	prometheus.MustRegister(aggregateCounter)
+	prometheus.MustRegister(getInvoiceCounter)
+}
 
 func main() {
 	httplistenAddr := flag.String("httplistenaddr", ":3030", "HTTP listen address of http server")
@@ -23,6 +45,7 @@ func main() {
 	var (
 		svc = NewInvoioceAggregator(store)
 	)
+	svc = NewMetricsMiddleware(svc)
 	svc = NewLoggingMiddleware(svc)
 	go func() {
 		log.Fatal(makeGRPCTransport(svc, grpclistenAddr))
@@ -36,6 +59,7 @@ func makeHTTPTransport(svc Aggregator, listenAddr *string) error {
 	slog.Info("HTTP Server:", "Addr", *listenAddr)
 	http.HandleFunc("/aggregate", handleAggregate(svc))
 	http.HandleFunc("/invoices", handleGetInvoice(svc))
+	http.Handle("/metrics", promhttp.Handler())
 	return http.ListenAndServe(*listenAddr, nil)
 }
 
@@ -56,6 +80,7 @@ func makeGRPCTransport(svc Aggregator, listenAddr *string) error {
 
 func handleAggregate(svc Aggregator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		aggregateCounter.Inc()
 		var distance types.Distance
 		if err := json.NewDecoder(r.Body).Decode(&distance); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
@@ -70,6 +95,7 @@ func handleAggregate(svc Aggregator) http.HandlerFunc {
 
 func handleGetInvoice(svc Aggregator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		getInvoiceCounter.Inc()
 		value, ok := r.URL.Query()["obu"]
 		if !ok {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": "obu is not provided"})
